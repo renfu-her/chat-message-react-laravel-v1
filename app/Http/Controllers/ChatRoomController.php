@@ -19,7 +19,7 @@ class ChatRoomController extends Controller
         // 個人專屬房間（擁有者）
         $ownedRooms = $user->ownedChatRooms()
             ->where('type', 'personal')
-            ->with(['owner', 'messages' => function ($query) {
+            ->with(['owner', 'members', 'messages' => function ($query) {
                 $query->latest()->limit(1);
             }])
             ->get();

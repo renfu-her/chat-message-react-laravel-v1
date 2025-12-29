@@ -156,6 +156,21 @@ export const messageAPI = {
     }),
 };
 
+// 用戶 API
+export const userAPI = {
+  getAll: (token: string) =>
+    request<{ users: any[] }>('/users', {
+      method: 'GET',
+      token,
+    }),
+
+  addFriend: (userId: number, token: string) =>
+    request<{ message: string; chat_room: any }>(`/users/${userId}/add-friend`, {
+      method: 'POST',
+      token,
+    }),
+};
+
 // 個人資料 API
 export const profileAPI = {
   get: (token: string) =>

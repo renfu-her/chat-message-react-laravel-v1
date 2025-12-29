@@ -67,13 +67,10 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, token, onClose, onUpdate
     setLoading(true);
 
     try {
-      const updateData: { name?: string; email?: string; avatar?: File } = {};
+      const updateData: { name?: string; avatar?: File } = {};
       
       if (name !== currentUser.name) {
         updateData.name = name;
-      }
-      if (email !== currentUser.email) {
-        updateData.email = email;
       }
       if (avatarFile) {
         updateData.avatar = avatarFile;
@@ -172,7 +169,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, token, onClose, onUpdate
             />
           </div>
 
-          {/* 電子郵件 */}
+          {/* 電子郵件（只讀） */}
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
               Email Address
@@ -180,10 +177,11 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, token, onClose, onUpdate
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-transparent rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary outline-none text-sm text-gray-900 dark:text-white transition-all"
-              required
+              readOnly
+              disabled
+              className="w-full bg-gray-100 dark:bg-gray-700 border border-transparent rounded-xl px-4 py-3 text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed transition-all"
             />
+            <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>
           </div>
 
           {/* 錯誤訊息 */}

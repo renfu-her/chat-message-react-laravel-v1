@@ -36,7 +36,7 @@ export function initializeEcho(token: string): Echo {
         Accept: 'application/json',
       },
     },
-    authEndpoint: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/broadcasting/auth`,
+    authEndpoint: `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}/broadcasting/auth`,
   });
 
   return echoInstance;

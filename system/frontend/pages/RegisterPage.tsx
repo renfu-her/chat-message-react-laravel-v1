@@ -24,3 +24,4 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
 
 export default RegisterPage;
 
+

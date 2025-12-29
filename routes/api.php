@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatRoomController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -35,4 +36,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // 個人資料路由
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
+
+    // 用戶路由
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users/{userId}/add-friend', [UserController::class, 'addFriend']);
 });

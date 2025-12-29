@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { authAPI, profileAPI } from '../services/api';
-import { initializeEcho, disconnectEcho } from '../services/echo';
+import { initializeEcho, disconnectEcho, getEcho } from '../services/echo';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -32,6 +32,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('auth_token'));
   const [loading, setLoading] = useState(true);
 
+  // 訂閱 Presence Channel 來追蹤用戶在線狀態
+  const subscribeToPresenceChannel = (echo: any, currentUserId: string) => {
+    try {
+      const presenceChannel = echo.join('presence-users')
+        .here((users: any[]) => {
+          // 當用戶加入時，這裡會收到所有當前在線的用戶
+          console.log('Users online:', users);
+        })
+        .joining((user: any) => {
+          // 當有用戶上線時
+          console.log('User joined:', user);
+        })
+        .leaving((user: any) => {
+          // 當有用戶下線時
+          console.log('User left:', user);
+        })
+        .error((error: any) => {
+          console.error('Presence channel error:', error);
+        });
+    } catch (error) {
+      console.error('Failed to subscribe to presence channel:', error);
+    }
+  };
+
   // 初始化：檢查 token 並載入用戶資料
   useEffect(() => {
     const initAuth = async () => {
@@ -58,7 +82,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             };
             setCurrentUser(apiUser);
           }
-          initializeEcho(token);
+          const echo = initializeEcho(token);
+          // 訂閱用戶在線狀態頻道
+          subscribeToPresenceChannel(echo, user.id.toString());
         } catch (error) {
           localStorage.removeItem('auth_token');
           setToken(null);
@@ -73,14 +99,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(authToken);
     setCurrentUser(user);
     localStorage.setItem('auth_token', authToken);
-    initializeEcho(authToken);
+    const echo = initializeEcho(authToken);
+    subscribeToPresenceChannel(echo, user.id);
   };
 
   const register = async (user: User, authToken: string) => {
     setToken(authToken);
     setCurrentUser(user);
     localStorage.setItem('auth_token', authToken);
-    initializeEcho(authToken);
+    const echo = initializeEcho(authToken);
+    subscribeToPresenceChannel(echo, user.id);
   };
 
   const logout = async () => {
@@ -107,4 +135,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
 

@@ -7,7 +7,7 @@ import TopNav from '../components/TopNav';
 import GroupManagement from '../components/GroupManagement';
 import Profile from '../components/Profile';
 import { useAuth } from '../contexts/AuthContext';
-import { chatRoomAPI, messageAPI } from '../services/api';
+import { chatRoomAPI, messageAPI, userAPI } from '../services/api';
 import { getEcho } from '../services/echo';
 
 const ChatPage: React.FC = () => {
@@ -16,9 +16,11 @@ const ChatPage: React.FC = () => {
   const { currentUser, token, logout, updateUser } = useAuth();
   const [theme, setTheme] = useState<Theme>('light');
   const [users, setUsers] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]); // 非朋友用戶
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set()); // 在線用戶 ID 集合
   const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeTab, setActiveTab] = useState<'personal' | 'group'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'group' | 'contact'>('personal');
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [isManagingGroup, setIsManagingGroup] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -79,11 +81,131 @@ const ChatPage: React.FC = () => {
     }
   }, [token]);
 
+  // 載入非朋友用戶（Contact）
+  const loadContacts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await userAPI.getAll(token);
+      const formattedContacts: User[] = data.users.map((user: any) => ({
+        id: user.id.toString(),
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar_url,
+        status: onlineUsers.has(user.id.toString()) ? 'online' : 'offline',
+      }));
+      setContacts(formattedContacts);
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+    }
+  }, [token, onlineUsers]);
+
+  // 從聊天室中提取朋友列表（需要從 API 重新獲取以獲取完整的用戶信息）
+  const loadFriends = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await chatRoomAPI.getAll(token);
+      // 從個人聊天室中提取所有成員（排除當前用戶）
+      const friendIds = new Set<number>();
+      [...data.owned_rooms, ...data.member_rooms].forEach((room: any) => {
+        if (room.type === 'personal' && room.members) {
+          room.members.forEach((member: any) => {
+            if (member.id !== currentUser?.id) {
+              friendIds.add(member.id);
+            }
+          });
+        }
+      });
+      
+      // 將成員信息轉換為 User 格式
+      const friendUsers: User[] = [];
+      [...data.owned_rooms, ...data.member_rooms].forEach((room: any) => {
+        if (room.type === 'personal' && room.members) {
+          room.members.forEach((member: any) => {
+            if (member.id !== currentUser?.id && !friendUsers.find(u => u.id === member.id.toString())) {
+              friendUsers.push({
+                id: member.id.toString(),
+                name: member.name,
+                email: member.email,
+                avatar: member.avatar_path ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${member.avatar_path}` : null,
+                status: onlineUsers.has(member.id.toString()) ? 'online' : 'offline',
+              });
+            }
+          });
+        }
+      });
+      setUsers(friendUsers);
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+    }
+  }, [token, currentUser]);
+
+  useEffect(() => {
+    if (token && currentUser) {
+      loadFriends();
+    }
+  }, [token, currentUser, loadFriends]);
+
+  // 訂閱用戶在線狀態頻道
+  useEffect(() => {
+    if (!token || !currentUser) return;
+
+    const echo = getEcho();
+    if (!echo) return;
+
+    const presenceChannel = echo.join('presence-users')
+      .here((users: any[]) => {
+        // 初始化在線用戶列表
+        const onlineIds = new Set(users.map((u: any) => u.id.toString()));
+        setOnlineUsers(onlineIds);
+        // 更新用戶狀態
+        setUsers(prev => prev.map(user => ({
+          ...user,
+          status: onlineIds.has(user.id) ? 'online' : 'offline',
+        })));
+      })
+      .joining((user: any) => {
+        // 有用戶上線
+        setOnlineUsers(prev => new Set([...prev, user.id.toString()]));
+        setUsers(prev => prev.map(u => 
+          u.id === user.id.toString() ? { ...u, status: 'online' } : u
+        ));
+        setContacts(prev => prev.map(u => 
+          u.id === user.id.toString() ? { ...u, status: 'online' } : u
+        ));
+      })
+      .leaving((user: any) => {
+        // 有用戶下線
+        setOnlineUsers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(user.id.toString());
+          return newSet;
+        });
+        setUsers(prev => prev.map(u => 
+          u.id === user.id.toString() ? { ...u, status: 'offline' } : u
+        ));
+        setContacts(prev => prev.map(u => 
+          u.id === user.id.toString() ? { ...u, status: 'offline' } : u
+        ));
+      })
+      .error((error: any) => {
+        console.error('Presence channel error:', error);
+      });
+
+    return () => {
+      try {
+        echo.leave('presence-users');
+      } catch (error) {
+        console.error('Error leaving presence channel:', error);
+      }
+    };
+  }, [token, currentUser]);
+
   useEffect(() => {
     if (token && currentUser) {
       loadChatRooms();
+      loadContacts();
     }
-  }, [token, currentUser, loadChatRooms]);
+  }, [token, currentUser, loadChatRooms, loadContacts]);
 
   // 載入聊天室訊息
   const loadMessages = useCallback(async (chatRoomId: number) => {
@@ -231,6 +353,7 @@ const ChatPage: React.FC = () => {
       <Sidebar 
         users={users}
         groups={chatRooms}
+        contacts={contacts}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeSession={activeSession}
@@ -244,6 +367,20 @@ const ChatPage: React.FC = () => {
         }}
         currentUser={currentUser}
         onNewGroup={() => setIsManagingGroup(true)}
+        onAddFriend={async (userId: string) => {
+          if (!token) return;
+          try {
+            await userAPI.addFriend(parseInt(userId), token);
+            // 重新載入聊天室和聯繫人
+            await loadChatRooms();
+            await loadContacts();
+            // 可以顯示成功消息
+            alert('Friend added successfully!');
+          } catch (error: any) {
+            console.error('Failed to add friend:', error);
+            alert(error.message || 'Failed to add friend');
+          }
+        }}
       />
 
       <div className="flex flex-col flex-1 relative overflow-hidden">

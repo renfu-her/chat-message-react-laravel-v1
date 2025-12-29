@@ -3,6 +3,9 @@
 use App\Models\ChatRoom;
 use Illuminate\Support\Facades\Broadcast;
 
+// 註冊廣播認證路由
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
 // 私人用戶頻道（個人專屬房間）
 Broadcast::channel('private-user.{userId}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
@@ -33,5 +36,15 @@ Broadcast::channel('public-chat-room.{roomId}', function ($user, $roomId) {
         'id' => $user->id,
         'name' => $user->name,
         'email' => $user->email,
+    ];
+});
+
+// 用戶在線狀態 Presence Channel（所有已認證用戶可訂閱）
+Broadcast::channel('presence-users', function ($user) {
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'avatar_path' => $user->avatar_path,
     ];
 });

@@ -32,7 +32,6 @@ class ProfileController extends Controller
     {
         $request->validate([
             'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $request->user()->id,
             'avatar' => 'sometimes|image|mimes:jpeg,jpg,png,gif,bmp,webp|max:5120', // 5MB max, 強制轉換為 WebP
         ]);
 
@@ -41,11 +40,6 @@ class ProfileController extends Controller
         // 更新名稱
         if ($request->has('name')) {
             $user->name = $request->name;
-        }
-
-        // 更新電子郵件
-        if ($request->has('email')) {
-            $user->email = $request->email;
         }
 
         // 處理頭像上傳（圖片轉 WebP，UUID 命名）
