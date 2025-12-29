@@ -1,6 +1,6 @@
-
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Group, ChatSession, Theme } from '../types';
+import Avatar from './Avatar';
 
 interface TopNavProps {
   theme: Theme;
@@ -16,6 +16,26 @@ interface TopNavProps {
 const TopNav: React.FC<TopNavProps> = ({ 
   theme, toggleTheme, currentUser, activeSession, activeGroup, onManageGroup, onOpenProfile, onLogout 
 }) => {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // 點擊外部關閉下拉選單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
+
   return (
     <header className="h-16 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md flex items-center justify-between px-6 z-10">
       <div className="flex items-center gap-4">
@@ -33,7 +53,11 @@ const TopNav: React.FC<TopNavProps> = ({
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                 <img src={`https://picsum.photos/seed/${activeSession.id}/100`} className="w-10 h-10 rounded-full" alt="" />
+                 <Avatar 
+                   src={null} 
+                   name={activeSession.id} 
+                   size="md" 
+                 />
                  <div>
                    <h2 className="font-bold text-sm">Chatting with {activeSession.id}</h2>
                    <p className="text-[10px] text-green-500">Online</p>
@@ -49,7 +73,7 @@ const TopNav: React.FC<TopNavProps> = ({
       <div className="flex items-center gap-2">
         <button 
           onClick={toggleTheme}
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
           title="Toggle Theme"
         >
           {theme === 'dark' ? (
@@ -62,32 +86,78 @@ const TopNav: React.FC<TopNavProps> = ({
         {activeGroup && (
           <button 
             onClick={onManageGroup}
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
             title="Group Settings"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           </button>
         )}
 
-        <button
-          onClick={onOpenProfile}
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
-          title="Profile Settings"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        </button>
-
         <div className="h-8 w-px bg-gray-200 dark:bg-gray-800 mx-2"></div>
 
-        <button 
-          onClick={onLogout}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-xs transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          Sign Out
-        </button>
+        {/* 用戶下拉選單 */}
+        <div className="relative" ref={userMenuRef}>
+          <button
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title="User Menu"
+          >
+            <Avatar
+              src={currentUser.avatar}
+              name={currentUser.name}
+              size="sm"
+              border
+            />
+            <svg
+              className={`w-4 h-4 text-gray-500 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* 下拉選單 */}
+          {isUserMenuOpen && (
+            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+              {/* 用戶資訊 */}
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{currentUser.email}</p>
+              </div>
+
+              {/* 選單項目 */}
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    onOpenProfile();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>Profile Settings</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    onLogout();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

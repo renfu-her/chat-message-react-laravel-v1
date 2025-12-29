@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Message, ChatSession, Attachment } from '../types';
+import Avatar from './Avatar';
 
 interface ChatWindowProps {
   session: ChatSession;
@@ -98,12 +99,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ session, messages, currentUser,
           
           return (
             <div key={msg.id} className={`flex items-end gap-2 ${isMeSent ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className="relative flex-shrink-0">
-                <img src={sender.avatar} className="w-8 h-8 rounded-full border border-gray-100 dark:border-gray-800" alt={sender.name} />
-                {sender.status === 'online' && (
-                  <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 border border-white dark:border-gray-900 rounded-full"></span>
-                )}
-              </div>
+              <Avatar
+                src={sender.avatar}
+                name={sender.name}
+                size="sm"
+                showStatus
+                status={sender.status}
+              />
               
               <div className={`flex flex-col max-w-[70%] ${isMeSent ? 'items-end' : 'items-start'}`}>
                 {session.type === 'group' && !isMeSent && (

@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Group } from '../types';
+import Avatar from './Avatar';
 
 interface GroupManagementProps {
   currentUser: User;
@@ -78,7 +79,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({
                     onClick={() => toggleMember(u.id)}
                     className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition-colors ${selectedMembers.includes(u.id) ? 'bg-primary/20 text-primary' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                   >
-                    <img src={u.avatar} className="w-6 h-6 rounded-full" alt="" />
+                    <Avatar src={u.avatar} name={u.name} size="sm" />
                     <span className="text-xs truncate">{u.name} {u.id === currentUser.id && '(Me)'}</span>
                     {selectedMembers.includes(u.id) && <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                   </button>
@@ -98,7 +99,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({
                       onClick={() => toggleDenied(u.id)}
                       className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition-colors ${deniedMembers.includes(u.id) ? 'bg-red-500 text-white shadow-lg' : 'hover:bg-red-100 dark:hover:bg-red-900/30'}`}
                     >
-                      <img src={u.avatar} className="w-6 h-6 rounded-full" alt="" />
+                      <Avatar src={u.avatar} name={u.name} size="sm" />
                       <span className="text-xs truncate">{u.name}</span>
                       {deniedMembers.includes(u.id) && <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636" /></svg>}
                     </button>

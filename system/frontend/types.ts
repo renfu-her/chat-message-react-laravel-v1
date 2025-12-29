@@ -5,7 +5,7 @@ export interface User {
   id: string;
   name: string;
   email: string; // Added email for login
-  avatar: string;
+  avatar: string | null;
   status: 'online' | 'offline';
   isMe?: boolean;
 }

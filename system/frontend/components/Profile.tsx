@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User } from '../types';
 import { profileAPI } from '../services/api';
+import Avatar from './Avatar';
 
 interface ProfileProps {
   currentUser: User;
@@ -129,10 +130,11 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, token, onClose, onUpdate
           {/* 頭像上傳 */}
           <div className="flex flex-col items-center">
             <div className="relative">
-              <img
+              <Avatar
                 src={avatar}
-                alt={name}
-                className="w-24 h-24 rounded-full border-4 border-primary object-cover"
+                name={name}
+                size="xl"
+                className="border-4 border-primary"
               />
               <button
                 type="button"

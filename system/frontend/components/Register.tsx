@@ -105,7 +105,7 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onGoToLogin }) => {
         id: response.user.id.toString(),
         name: response.user.name,
         email: response.user.email,
-        avatar: `https://picsum.photos/seed/${response.user.id}/200`,
+        avatar: null, // 預設沒有頭像，使用 Avatar 組件顯示預設頭像
         status: 'online',
       };
       onRegister(apiUser, response.token);
