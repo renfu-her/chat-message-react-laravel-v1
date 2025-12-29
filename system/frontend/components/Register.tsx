@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
+import { authAPI } from '../services/api';
 
 interface RegisterProps {
-  onRegister: (name: string, email: string) => void;
+  onRegister: (user: User, token: string) => void;
   onGoToLogin: () => void;
 }
 
@@ -14,6 +15,7 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onGoToLogin }) => {
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const generateCaptcha = () => {
@@ -75,7 +77,7 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onGoToLogin }) => {
     }
   }, [captchaCode]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -84,8 +86,8 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onGoToLogin }) => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -96,7 +98,24 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onGoToLogin }) => {
       return;
     }
 
-    onRegister(name, email);
+    setLoading(true);
+    try {
+      const response = await authAPI.register(name, email, password);
+      const apiUser: User = {
+        id: response.user.id.toString(),
+        name: response.user.name,
+        email: response.user.email,
+        avatar: `https://picsum.photos/seed/${response.user.id}/200`,
+        status: 'online',
+      };
+      onRegister(apiUser, response.token);
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
+      generateCaptcha();
+      setCaptchaInput('');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -171,9 +190,10 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onGoToLogin }) => {
 
           <button 
             type="submit"
-            className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-blue-600 shadow-lg shadow-primary/20 transition-all mt-2"
+            disabled={loading}
+            className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-blue-600 shadow-lg shadow-primary/20 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign Up
+            {loading ? 'Creating account...' : 'Sign Up'}
           </button>
         </form>
 

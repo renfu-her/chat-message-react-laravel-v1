@@ -1,25 +1,26 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Theme, User, Group, ChatSession, Message, Attachment } from './types';
-import { INITIAL_USERS, INITIAL_GROUPS } from './constants';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import TopNav from './components/TopNav';
 import GroupManagement from './components/GroupManagement';
 import Login from './components/Login';
 import Register from './components/Register';
-import { GoogleGenAI } from "@google/genai";
+import { authAPI, chatRoomAPI, messageAPI } from './services/api';
+import { initializeEcho, disconnectEcho, getEcho } from './services/echo';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<Theme>('light');
   const [authView, setAuthView] = useState<'login' | 'register' | 'chat'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
+  const [token, setToken] = useState<string | null>(localStorage.getItem('auth_token'));
+  const [users, setUsers] = useState<User[]>([]);
+  const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'personal' | 'group'>('personal');
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [isManagingGroup, setIsManagingGroup] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -30,118 +31,240 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
+  // 初始化：檢查 token 並載入用戶資料
+  useEffect(() => {
+    const initAuth = async () => {
+      if (token) {
+        try {
+          const user = await authAPI.getUser(token);
+          const apiUser: User = {
+            id: user.id.toString(),
+            name: user.name,
+            email: user.email,
+            avatar: `https://picsum.photos/seed/${user.id}/200`,
+            status: 'online',
+          };
+          setCurrentUser(apiUser);
+          setAuthView('chat');
+          initializeEcho(token);
+          loadChatRooms(token);
+        } catch (error) {
+          localStorage.removeItem('auth_token');
+          setToken(null);
+        }
+      }
+    };
+    initAuth();
+  }, []);
+
+  // 載入聊天室列表
+  const loadChatRooms = async (authToken: string) => {
+    try {
+      const data = await chatRoomAPI.getAll(authToken);
+      // 轉換聊天室數據為 Group 格式
+      const allRooms = [
+        ...data.owned_rooms.map((room: any) => ({
+          id: room.id.toString(),
+          name: room.name,
+          type: room.type,
+          creatorId: room.user_id?.toString() || '',
+          members: room.members?.map((m: any) => m.id.toString()) || [],
+          deniedMembers: [],
+        })),
+        ...data.member_rooms.map((room: any) => ({
+          id: room.id.toString(),
+          name: room.name,
+          type: room.type,
+          creatorId: room.user_id?.toString() || '',
+          members: room.members?.map((m: any) => m.id.toString()) || [],
+          deniedMembers: [],
+        })),
+      ];
+      setChatRooms(allRooms);
+      
+      // 載入用戶列表（從聊天室成員中提取）
+      const allUserIds = new Set<string>();
+      allRooms.forEach((room: any) => {
+        room.members.forEach((id: string) => allUserIds.add(id));
+      });
+      // 這裡可以添加 API 來獲取所有用戶，目前使用聊天室成員
+    } catch (error) {
+      console.error('Failed to load chat rooms:', error);
+    }
+  };
+
+  // 載入聊天室訊息
+  const loadMessages = useCallback(async (chatRoomId: number) => {
+    if (!token) return;
+    try {
+      const msgs = await messageAPI.getByChatRoom(chatRoomId, token);
+      const formattedMessages: Message[] = msgs.map((msg: any) => ({
+        id: msg.id.toString(),
+        senderId: msg.user_id.toString(),
+        recipientId: undefined,
+        groupId: undefined,
+        text: msg.content,
+        attachment: msg.attachment_path ? {
+          url: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${msg.attachment_path}`,
+          name: msg.attachment_path.split('/').pop() || 'attachment',
+          mimeType: 'image/webp',
+          size: 0,
+          isImage: true,
+        } : undefined,
+        timestamp: new Date(msg.created_at).getTime(),
+      }));
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    }
+  }, [token]);
+
+  // 當切換聊天室時載入訊息
+  useEffect(() => {
+    if (activeSession && token) {
+      const chatRoomId = parseInt(activeSession.id);
+      if (!isNaN(chatRoomId)) {
+        loadMessages(chatRoomId);
+        subscribeToChannel(chatRoomId);
+      }
+    }
+  }, [activeSession, token, loadMessages]);
+
+  // 訂閱 WebSocket 頻道
+  const subscribeToChannel = (chatRoomId: number) => {
+    const echo = getEcho();
+    if (!echo) return;
+
+    // 根據聊天室類型選擇頻道（這裡簡化處理，實際應該從聊天室數據獲取類型）
+    const channelName = `private-chat-room.${chatRoomId}`;
+    
+    echo.private(channelName)
+      .listen('.message.sent', (e: any) => {
+        const msg = e.message;
+        const newMessage: Message = {
+          id: msg.id.toString(),
+          senderId: msg.user_id.toString(),
+          recipientId: undefined,
+          groupId: undefined,
+          text: msg.content,
+          attachment: msg.attachment_path ? {
+            url: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${msg.attachment_path}`,
+            name: msg.attachment_path.split('/').pop() || 'attachment',
+            mimeType: 'image/webp',
+            size: 0,
+            isImage: true,
+          } : undefined,
+          timestamp: new Date(msg.created_at).getTime(),
+        };
+        setMessages(prev => [...prev, newMessage]);
+      });
+  };
+
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-  const handleLogin = (user: User) => {
+  const handleLogin = async (user: User, authToken: string) => {
+    setToken(authToken);
     setCurrentUser(user);
     setAuthView('chat');
+    localStorage.setItem('auth_token', authToken);
+    initializeEcho(authToken);
+    await loadChatRooms(authToken);
   };
 
-  const handleRegister = (name: string, email: string) => {
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name: name,
-      email: email,
-      avatar: `https://picsum.photos/seed/${name}/200`,
-      status: 'online',
-    };
-    setUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
+  const handleRegister = async (user: User, authToken: string) => {
+    setToken(authToken);
+    setCurrentUser(user);
     setAuthView('chat');
+    localStorage.setItem('auth_token', authToken);
+    initializeEcho(authToken);
+    await loadChatRooms(authToken);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (token) {
+      try {
+        await authAPI.logout(token);
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+    disconnectEcho();
+    localStorage.removeItem('auth_token');
+    setToken(null);
     setCurrentUser(null);
     setAuthView('login');
     setActiveSession(null);
+    setMessages([]);
+    setChatRooms([]);
   };
 
-  const sendMessage = (text?: string, attachment?: Attachment) => {
-    if (!activeSession || !currentUser || (!text?.trim() && !attachment)) return;
+  const sendMessage = async (text?: string, attachment?: Attachment) => {
+    if (!activeSession || !currentUser || !token || (!text?.trim() && !attachment)) return;
 
-    const isGroup = activeSession.type === 'group';
-    
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: currentUser.id,
-      recipientId: !isGroup ? activeSession.id : undefined,
-      groupId: isGroup ? activeSession.id : undefined,
-      text: text?.trim(),
-      attachment,
-      timestamp: Date.now(),
-    };
+    const chatRoomId = parseInt(activeSession.id);
+    if (isNaN(chatRoomId)) return;
 
-    setMessages(prev => [...prev, newMessage]);
-
-    if (activeSession.type === 'personal' && activeSession.id === 'user-2') {
-       if (text) triggerGeminiResponse(text);
-       else if (attachment) triggerGeminiResponse(`You sent me a file: ${attachment.name}`);
-    }
-  };
-
-  const triggerGeminiResponse = async (userMsg: string) => {
     try {
-      if (!currentUser) return;
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Act as a user in a chat application. Reply briefly to: "${userMsg}"`,
-      });
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        senderId: 'user-2',
-        recipientId: currentUser.id,
-        text: response.text || 'Got it!',
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, aiMessage]);
-    } catch (err) {
-      console.error("Gemini Error:", err);
+      const file = attachment ? await fetch(attachment.url).then(r => r.blob()).then(blob => {
+        const file = new File([blob], attachment.name, { type: attachment.mimeType });
+        return file;
+      }) : undefined;
+
+      await messageAPI.send(chatRoomId, {
+        content: text,
+        attachment: file,
+      }, token);
+
+      // 訊息會通過 WebSocket 接收，這裡不需要手動添加
+    } catch (error) {
+      console.error('Failed to send message:', error);
     }
   };
 
-  const handleCreateGroup = (name: string, members: string[]) => {
-    if (!currentUser) return;
-    const newGroup: Group = {
-      id: `group-${Date.now()}`,
-      name,
-      creatorId: currentUser.id,
-      members: [...new Set([currentUser.id, ...members])],
-      deniedMembers: [],
-    };
-    setGroups(prev => [...prev, newGroup]);
-    setActiveSession({ type: 'group', id: newGroup.id });
-    setIsManagingGroup(false);
+  const handleCreateGroup = async (name: string, members: string[]) => {
+    if (!currentUser || !token) return;
+    
+    setLoading(true);
+    try {
+      const memberIds = members.map(id => parseInt(id)).filter(id => !isNaN(id));
+      const room = await chatRoomAPI.create({
+        name,
+        type: 'private',
+        member_ids: memberIds,
+      }, token);
+      
+      setActiveSession({ type: 'group', id: room.id.toString() });
+      setIsManagingGroup(false);
+      await loadChatRooms(token);
+    } catch (error) {
+      console.error('Failed to create group:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateGroup = (groupId: string, updates: Partial<Group>) => {
-    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, ...updates } : g));
+  const updateGroup = async (groupId: string, updates: Partial<Group>) => {
+    // 這裡可以添加更新聊天室的 API 調用
+    setChatRooms(prev => prev.map(g => g.id === groupId ? { ...g, ...updates } : g));
   };
 
   const filteredMessages = useMemo(() => {
     if (!activeSession || !currentUser) return [];
-    if (activeSession.type === 'group') {
-      return messages.filter(m => m.groupId === activeSession.id);
-    } else {
-      const otherUserId = activeSession.id;
-      return messages.filter(m => 
-        !m.groupId && (
-          (m.senderId === currentUser.id && m.recipientId === otherUserId) ||
-          (m.senderId === otherUserId && m.recipientId === currentUser.id)
-        )
-      );
-    }
+    return messages.filter(m => {
+      const sessionId = parseInt(activeSession.id);
+      return m.groupId === activeSession.id || 
+             (activeSession.type === 'personal' && (m.senderId === currentUser.id || m.recipientId === activeSession.id));
+    });
   }, [messages, activeSession, currentUser]);
 
   const activeGroup = activeSession?.type === 'group' 
-    ? groups.find(g => g.id === activeSession.id) 
+    ? chatRooms.find(g => g.id === activeSession.id) 
     : null;
 
   const isDeniedFromGroup = activeGroup?.deniedMembers.includes(currentUser?.id || '');
 
   if (authView === 'login') {
-    return <Login users={users} onLogin={handleLogin} onGoToRegister={() => setAuthView('register')} />;
+    return <Login onLogin={handleLogin} onGoToRegister={() => setAuthView('register')} />;
   }
   if (authView === 'register') {
     return <Register onRegister={handleRegister} onGoToLogin={() => setAuthView('login')} />;
@@ -153,7 +276,7 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-dark text-gray-900 dark:text-gray-100 transition-colors duration-200">
       <Sidebar 
         users={users}
-        groups={groups}
+        groups={chatRooms}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeSession={activeSession}

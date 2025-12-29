@@ -1,8 +1,33 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatRoomController;
+use App\Http\Controllers\MessageController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+// 認證路由（無需認證）
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/login', [AuthController::class, 'login']);
+
+// 需要認證的路由
+Route::middleware('auth:sanctum')->group(function () {
+    // 認證相關
+    Route::get('/auth/user', function (Request $request) {
+        return $request->user();
+    });
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    // 聊天室路由
+    Route::get('/chat-rooms', [ChatRoomController::class, 'index']);
+    Route::post('/chat-rooms', [ChatRoomController::class, 'store']);
+    Route::get('/chat-rooms/{id}', [ChatRoomController::class, 'show']);
+    Route::post('/chat-rooms/{id}/join', [ChatRoomController::class, 'join']);
+    Route::post('/chat-rooms/{id}/leave', [ChatRoomController::class, 'leave']);
+    Route::delete('/chat-rooms/{id}', [ChatRoomController::class, 'destroy']);
+
+    // 訊息路由
+    Route::get('/chat-rooms/{chatRoomId}/messages', [MessageController::class, 'index']);
+    Route::post('/chat-rooms/{chatRoomId}/messages', [MessageController::class, 'store']);
+    Route::post('/chat-rooms/{chatRoomId}/messages/{messageId}/read', [MessageController::class, 'markAsRead']);
+});

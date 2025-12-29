@@ -1,20 +1,20 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
-import { MOCK_PASSWORD } from '../constants';
+import { authAPI } from '../services/api';
 
 interface LoginProps {
-  users: User[];
-  onLogin: (user: User) => void;
+  onLogin: (user: User, token: string) => void;
   onGoToRegister: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ users, onLogin, onGoToRegister }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const generateCaptcha = () => {
@@ -78,7 +78,7 @@ const Login: React.FC<LoginProps> = ({ users, onLogin, onGoToRegister }) => {
     }
   }, [captchaCode]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -94,14 +94,23 @@ const Login: React.FC<LoginProps> = ({ users, onLogin, onGoToRegister }) => {
       return;
     }
 
-    const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (foundUser && password === MOCK_PASSWORD) {
-      onLogin(foundUser);
-    } else {
-      setError('Invalid email or password.');
+    setLoading(true);
+    try {
+      const response = await authAPI.login(email, password);
+      const apiUser: User = {
+        id: response.user.id.toString(),
+        name: response.user.name,
+        email: response.user.email,
+        avatar: `https://picsum.photos/seed/${response.user.id}/200`,
+        status: 'online',
+      };
+      onLogin(apiUser, response.token);
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password.');
       generateCaptcha();
       setCaptchaInput('');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -164,9 +173,10 @@ const Login: React.FC<LoginProps> = ({ users, onLogin, onGoToRegister }) => {
 
           <button 
             type="submit"
-            className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-blue-600 shadow-lg shadow-primary/20 transition-all mt-2"
+            disabled={loading}
+            className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-blue-600 shadow-lg shadow-primary/20 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
@@ -180,10 +190,6 @@ const Login: React.FC<LoginProps> = ({ users, onLogin, onGoToRegister }) => {
           </button>
         </div>
 
-        <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-[10px] text-gray-500 leading-relaxed">
-          <p className="font-bold mb-1">Demo Access:</p>
-          <p>Email: <b>user1@example.com</b> to <b>user20@example.com</b><br/>Password: <b>user123</b></p>
-        </div>
       </div>
     </div>
   );
