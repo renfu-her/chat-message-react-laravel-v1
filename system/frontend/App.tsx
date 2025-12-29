@@ -4,9 +4,10 @@ import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import TopNav from './components/TopNav';
 import GroupManagement from './components/GroupManagement';
+import Profile from './components/Profile';
 import Login from './components/Login';
 import Register from './components/Register';
-import { authAPI, chatRoomAPI, messageAPI } from './services/api';
+import { authAPI, chatRoomAPI, messageAPI, profileAPI } from './services/api';
 import { initializeEcho, disconnectEcho, getEcho } from './services/echo';
 
 const App: React.FC = () => {
@@ -20,6 +21,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'personal' | 'group'>('personal');
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [isManagingGroup, setIsManagingGroup] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,14 +39,27 @@ const App: React.FC = () => {
       if (token) {
         try {
           const user = await authAPI.getUser(token);
-          const apiUser: User = {
-            id: user.id.toString(),
-            name: user.name,
-            email: user.email,
-            avatar: `https://picsum.photos/seed/${user.id}/200`,
-            status: 'online',
-          };
-          setCurrentUser(apiUser);
+          // 嘗試獲取個人資料以取得頭像
+          try {
+            const profile = await profileAPI.get(token);
+            const apiUser: User = {
+              id: user.id.toString(),
+              name: user.name,
+              email: user.email,
+              avatar: profile.avatar_url || `https://picsum.photos/seed/${user.id}/200`,
+              status: 'online',
+            };
+            setCurrentUser(apiUser);
+          } catch {
+            const apiUser: User = {
+              id: user.id.toString(),
+              name: user.name,
+              email: user.email,
+              avatar: `https://picsum.photos/seed/${user.id}/200`,
+              status: 'online',
+            };
+            setCurrentUser(apiUser);
+          }
           setAuthView('chat');
           initializeEcho(token);
           loadChatRooms(token);
@@ -248,6 +263,10 @@ const App: React.FC = () => {
     setChatRooms(prev => prev.map(g => g.id === groupId ? { ...g, ...updates } : g));
   };
 
+  const handleUpdateProfile = (updatedUser: User) => {
+    setCurrentUser(updatedUser);
+  };
+
   const filteredMessages = useMemo(() => {
     if (!activeSession || !currentUser) return [];
     return messages.filter(m => {
@@ -293,6 +312,7 @@ const App: React.FC = () => {
           activeSession={activeSession}
           activeGroup={activeGroup}
           onManageGroup={() => setIsManagingGroup(true)}
+          onOpenProfile={() => setIsProfileOpen(true)}
           onLogout={handleLogout}
         />
         
@@ -341,6 +361,15 @@ const App: React.FC = () => {
             if (activeGroup) updateGroup(activeGroup.id, updates);
             setIsManagingGroup(false);
           }}
+        />
+      )}
+
+      {isProfileOpen && token && currentUser && (
+        <Profile
+          currentUser={currentUser}
+          token={token}
+          onClose={() => setIsProfileOpen(false)}
+          onUpdate={handleUpdateProfile}
         />
       )}
     </div>

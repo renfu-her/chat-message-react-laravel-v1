@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatRoomController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,4 +31,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/chat-rooms/{chatRoomId}/messages', [MessageController::class, 'index']);
     Route::post('/chat-rooms/{chatRoomId}/messages', [MessageController::class, 'store']);
     Route::post('/chat-rooms/{chatRoomId}/messages/{messageId}/read', [MessageController::class, 'markAsRead']);
+
+    // 個人資料路由
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
 });

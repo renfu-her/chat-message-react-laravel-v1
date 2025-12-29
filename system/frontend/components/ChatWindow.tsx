@@ -127,7 +127,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ session, messages, currentUser,
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50">
+      <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
         <form onSubmit={handleSend} className="flex gap-2 items-center">
           <input 
             type="file" 
@@ -139,7 +139,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ session, messages, currentUser,
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
             title="Attach a file"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
@@ -150,7 +150,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ session, messages, currentUser,
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 bg-gray-100 dark:bg-gray-800 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white text-sm"
+            className="flex-1 bg-gray-100 dark:bg-gray-800 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all text-gray-900 dark:text-white text-sm placeholder-gray-500 dark:placeholder-gray-400"
           />
           
           <button

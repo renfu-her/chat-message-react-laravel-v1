@@ -156,3 +156,46 @@ export const messageAPI = {
     }),
 };
 
+// 個人資料 API
+export const profileAPI = {
+  get: (token: string) =>
+    request<any>('/profile', {
+      method: 'GET',
+      token,
+    }),
+
+  update: async (
+    data: { name?: string; email?: string; avatar?: File },
+    token: string
+  ) => {
+    const formData = new FormData();
+    if (data.name) {
+      formData.append('name', data.name);
+    }
+    if (data.email) {
+      formData.append('email', data.email);
+    }
+    if (data.avatar) {
+      formData.append('avatar', data.avatar);
+    }
+
+    const headers: HeadersInit = {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+
+    const response = await fetch(`${API_BASE_URL}/profile`, {
+      method: 'PUT',
+      body: formData,
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(error.error || error.message || 'Request failed');
+    }
+
+    return response.json();
+  },
+};
+
